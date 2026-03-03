@@ -101,6 +101,11 @@ set hlsearch
 " Makes search act like search in modern browsers
 set incsearch
 
+if executable('rg')
+    set grepprg=rg\ --vimgrep\ --smart-case\ --hidden\ --glob\ !.git
+    set grepformat=%f:%l:%c:%m
+endif
+
 " Don't redraw while executing macros (good performance config)
 set lazyredraw
 
@@ -129,9 +134,19 @@ set foldcolumn=1
 
 " Set line numbers
 set number
-set binary
-set noeol
 set wildmenu
+
+if has('mouse')
+    set mouse=a
+endif
+
+if has('mouse_sgr')
+    set ttymouse=sgr
+endif
+
+if has('clipboard')
+    set clipboard=unnamed,unnamedplus
+endif
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => Colors and Fonts
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -173,6 +188,15 @@ set nobackup
 set nowb
 set noswapfile
 
+if has('persistent_undo')
+    let s:undo_dir = expand('~/.vim/undo')
+    if !isdirectory(s:undo_dir)
+        call mkdir(s:undo_dir, 'p', 0700)
+    endif
+    let &undodir = s:undo_dir
+    set undofile
+endif
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => Text, tab and indent related
@@ -193,7 +217,12 @@ set tw=500
 
 set ai "Auto indent
 set si "Smart indent
-set wrap "Wrap lines
+set nowrap
+
+augroup WrapTextLikeFiles
+    autocmd!
+    autocmd FileType markdown,text,gitcommit,tex,plaintex setlocal wrap linebreak
+augroup END
 
 
 """"""""""""""""""""""""""""""
@@ -332,6 +361,9 @@ map <leader>x :e ~/buffer.md<cr>
 " Toggle paste mode on and off
 map <leader>pp :setlocal paste!<cr>
 
+" Project search with ripgrep-backed quickfix.
+nnoremap <leader>rg :Rg<Space>
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => Helper functions
@@ -369,6 +401,17 @@ function! CmdLine(str)
     call feedkeys(":" . a:str)
 endfunction
 
+function! RgSearch(query)
+    if executable('rg')
+        execute 'silent grep! ' . shellescape(a:query)
+    else
+        execute 'silent vimgrep /' . escape(a:query, '/\') . '/gj **/*'
+    endif
+    copen
+endfunction
+
+command! -nargs=+ Rg call RgSearch(<q-args>)
+
 function! VisualSelection(direction, extra_filter) range
     let l:saved_reg = @"
     execute "normal! vgvy"
@@ -377,7 +420,11 @@ function! VisualSelection(direction, extra_filter) range
     let l:pattern = substitute(l:pattern, "\n$", "", "")
 
     if a:direction == 'gv'
-        call CmdLine("Ack '" . l:pattern . "' " )
+        if exists(':Ack') == 2
+            call CmdLine("Ack '" . l:pattern . "' " )
+        else
+            call RgSearch(l:pattern)
+        endif
     elseif a:direction == 'replace'
         call CmdLine("%s" . '/'. l:pattern . '/')
     endif
