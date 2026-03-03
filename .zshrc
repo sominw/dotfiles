@@ -111,21 +111,63 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 alias sudo='sudo '
-alias reload="exec ${SHELL} -l"
+
+# History settings tuned for long-running, multi-project workflows.
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=200000
+SAVEHIST=200000
+setopt inc_append_history
+setopt share_history
+setopt hist_ignore_all_dups
+setopt hist_reduce_blanks
+
+# Completion defaults: case-insensitive matching and interactive menu selection.
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' menu select
+
+is_macos() { [[ "$OSTYPE" == darwin* ]]; }
+is_linux() { [[ "$OSTYPE" == linux* ]]; }
+
+# Meeting transcript scaffolding for Granola export
+# Usage: newmeeting <project> <type> <attendees>
+# Types: 1on1, standup, design-review, ad-hoc
+# Example: newmeeting thg-t1-expansion 1on1 "manager-name, pm-alice"
+newmeeting() {
+  local project="$1" type="$2" attendees="$3"
+  local date=$(date +%Y-%m-%d)
+  local dir="$HOME/active-projects/$project/.meeting-notes/transcripts"
+  local file="$dir/$date-$type.md"
+  mkdir -p "$dir"
+  cat > "$file" << EOF
+---
+date: $date
+attendees: [$attendees]
+type: $type
+project: $project
+---
+
+EOF
+  echo "Created $file — paste Granola notes below the frontmatter"
+  if is_macos && command -v open >/dev/null 2>&1; then
+    open "$file"
+  else
+    "${EDITOR:-vim}" "$file"
+  fi
+}
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/Users/sominw/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
-else
-    if [ -f "/Users/sominw/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/Users/sominw/miniconda3/etc/profile.d/conda.sh"
-    else
-        export PATH="/Users/sominw/miniconda3/bin:$PATH"
-    fi
-fi
-unset __conda_setup
+# __conda_setup="$('/Users/sominw/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+# if [ $? -eq 0 ]; then
+#     eval "$__conda_setup"
+# else
+#     if [ -f "/Users/sominw/miniconda3/etc/profile.d/conda.sh" ]; then
+#         . "/Users/sominw/miniconda3/etc/profile.d/conda.sh"
+#     else
+#         export PATH="/Users/sominw/miniconda3/bin:$PATH"
+#     fi
+# fi
+# unset __conda_setup
 # <<< conda initialize <<<
 
 
@@ -143,8 +185,53 @@ plugins=(
   zsh-syntax-highlighting
 )
 
+source $ZSH/oh-my-zsh.sh
+
+# Optional productivity integrations; loaded only when installed.
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook zsh)"
+fi
+
+if [[ -r "$HOME/.iterm2_shell_integration.zsh" ]]; then
+  source "$HOME/.iterm2_shell_integration.zsh"
+elif is_macos && [[ -r "/Applications/iTerm.app/Contents/Resources/iterm2_shell_integration.zsh" ]]; then
+  source "/Applications/iTerm.app/Contents/Resources/iterm2_shell_integration.zsh"
+fi
+
+if [[ -o interactive && -t 0 && -t 1 ]]; then
+  if [[ -f /opt/homebrew/opt/fzf/shell/completion.zsh ]]; then
+    source /opt/homebrew/opt/fzf/shell/completion.zsh
+  elif [[ -f /usr/share/fzf/completion.zsh ]]; then
+    source /usr/share/fzf/completion.zsh
+  elif [[ -f "$HOME/.fzf/shell/completion.zsh" ]]; then
+    source "$HOME/.fzf/shell/completion.zsh"
+  fi
+
+  if [[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ]]; then
+    source /opt/homebrew/opt/fzf/shell/key-bindings.zsh
+  elif [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
+    source /usr/share/fzf/key-bindings.zsh
+  elif [[ -f "$HOME/.fzf/shell/key-bindings.zsh" ]]; then
+    source "$HOME/.fzf/shell/key-bindings.zsh"
+  fi
+fi
+
+if command -v nvim >/dev/null 2>&1; then
+  alias nv='nvim'
+fi
+
+tkeys() {
+  local cheatsheet="$HOME/dotfiles/TERMINAL_CHEATSHEET.md"
+  if [[ -f "$cheatsheet" ]]; then
+    cat "$cheatsheet"
+  else
+    echo "Cheatsheet not found: $cheatsheet"
+  fi
+}
+
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-
-source $ZSH/oh-my-zsh.sh
